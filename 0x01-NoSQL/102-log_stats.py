@@ -1,41 +1,47 @@
 #!/usr/bin/env python3
-"""MongoDB storage"""
+"""Improved log stats module"""
 from pymongo import MongoClient
 
 
 if __name__ == "__main__":
-    """check for elements in  collection"""
-    client = MongoClient('mongodb://localhost:27017')
-    collection = client.logs.nginx
+    client = MongoClient('mongodb://127.0.0.1:27017')
+    db = client.logs.nginx
 
-    print(f"{collection.estimated_document_count()} logs")
+    num_logs = db.count_documents({})
+    print(f"{num_logs} logs")
 
-    methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    get = db.count_documents({'method': 'GET'})
+    post = db.count_documents({'method': 'POST'})
+    put = db.count_documents({'method': 'PUT'})
+    patch = db.count_documents({'method': 'PATCH'})
+    delete = db.count_documents({'method': 'DELETE'})
+
     print("Methods:")
-    for method in methods:
-        count = collection.count_documents({"method": method})
-        print(f"\tmethod {method}: {count}")
+    print(f"\tmethod GET: {get}")
+    print(f"\tmethod POST: {post}")
+    print(f"\tmethod PUT: {put}")
+    print(f"\tmethod PATCH: {patch}")
+    print(f"\tmethod DELETE: {delete}")
 
-    status_check = collection.count_documents({"method": "GET", "path": "/status"})
-    print(f"{status_check} status check")
+    status = db.count_documents({'method': 'GET', 'path': '/status'})
+    print(f"{status} status check")
 
     print("IPs:")
-    pipeline = [
+    ips = db.aggregate([
+        {"$group":
             {
-                '$group': {
-                    '_id': '$ip',
-                    'count': {'$sum': 1}
-                }
-            },
-            {
-                '$sort': {
-                    'count': -1
-                }
-            },
-            {
-                '$limit': 10
+                "_id": "$ip",
+                "count": {"$sum": 1}
             }
-    ]
-    result = collection.aggregate(pipeline)
-    for doc in result:
-        print(f"\t{doc['_id']}: {doc['count']}")
+         },
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+        {"$project": {
+            "_id": 0,
+            "ip": "$_id",
+            "count": 1
+        }}
+    ])
+
+    for ip in ips:
+        print(f"\t{ip.get('ip')}: {ip.get('count')}")
